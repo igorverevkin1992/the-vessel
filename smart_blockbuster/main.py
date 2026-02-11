@@ -61,6 +61,7 @@ from .production import (
     format_production_stage,
     import_script_json,
 )
+from .orchestrator import run_pipeline, show_pipeline_info
 
 
 BANNER = r"""
@@ -93,6 +94,10 @@ def main_menu():
   7. Производственный протокол (5 этапов)
   8. Анализ JSON-сценария
   9. Демонстрация (пример «Умного блокбастера»)
+
+  A. КОНВЕЙЕР АГЕНТОВ (Scout → Radar → Analyst → Architect → Writer)
+  I. Информация о конвейере агентов
+
   0. Выход
 """)
 
@@ -116,11 +121,15 @@ def main_menu():
             _menu_analyze_json()
         elif choice == "9":
             _menu_demo()
+        elif choice.lower() == "a":
+            _menu_agent_pipeline()
+        elif choice.lower() == "i":
+            show_pipeline_info()
         elif choice == "0":
             print("\nДо встречи! Создавайте «Умные блокбастеры».")
             break
         else:
-            print("Неверный выбор. Введите число 0-9.")
+            print("Неверный выбор.")
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +254,17 @@ def _menu_analyze_json():
         print(f"  Файл не найден: {filepath}")
     except Exception as e:
         print(f"  Ошибка чтения: {e}")
+
+
+def _menu_agent_pipeline():
+    """Пункт A: Конвейер агентов."""
+    print("\n  Режим конвейера:")
+    print("    1. Автоматический (без пауз)")
+    print("    2. Пошаговый (ревью между агентами)")
+
+    mode = input("  Выбор (1/2): ").strip()
+    steppable = mode == "2"
+    run_pipeline(steppable=steppable)
 
 
 def _menu_demo():
@@ -390,10 +410,20 @@ def cli():
     parser.add_argument("--analyze", type=str, help="Анализ JSON-сценария")
     parser.add_argument("--protocol", action="store_true", help="Производственный протокол")
     parser.add_argument("--text", type=str, help="Анализ текстового файла")
+    parser.add_argument("--pipeline", action="store_true",
+                        help="Запустить конвейер агентов (Scout → Writer)")
+    parser.add_argument("--steppable", action="store_true",
+                        help="Пошаговый режим конвейера (с --pipeline)")
+    parser.add_argument("--agents-info", action="store_true",
+                        help="Информация о конвейере агентов")
 
     args = parser.parse_args()
 
-    if args.demo:
+    if args.pipeline:
+        run_pipeline(steppable=args.steppable)
+    elif args.agents_info:
+        show_pipeline_info()
+    elif args.demo:
         _menu_demo()
     elif args.analyze:
         try:
