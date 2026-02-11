@@ -1,0 +1,5 @@
+{
+  "name": "THE VESSEL.CORE V1.0",
+  "description": "An autonomous AI video production system implementing the 'Narrative Detective' architecture. Features a Chain of Agents (Scout, Decoder, Researcher, Architect, Narrator) to generate investigative video essays that decode narratives through the lens of cinema, literature, and pop culture.",
+  "requestFramePermissions": []
+}
