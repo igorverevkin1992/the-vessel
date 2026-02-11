@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/* Custom theme colors — Noir / Dark Academia */
+@theme {
+  --color-tv-black: #0a0a0a;
+  --color-tv-amber: #d4a017;
+  --color-tv-gray: #1a1a2e;
+  --color-tv-slate: #475569;
+
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Base styles */
+body {
+  background-color: #0a0a0a;
+  color: #e2e8f0;
+}
+
+/* Custom scrollbar for noir terminal look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
