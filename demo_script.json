@@ -1,0 +1,79 @@
+{
+  "title": "Почему Starbucks на самом деле банк",
+  "promise": "Раскрыть скрытую финансовую модель Starbucks",
+  "total_duration_sec": 720,
+  "hook": {
+    "archetype": "contrarian",
+    "steps": [
+      {
+        "name": "Контекстное вовлечение + Якорь",
+        "goal": "Мгновенная ясность темы + Сенсорное доказательство",
+        "text": "Посмотрите на этот финансовый отчёт Starbucks за 2024 год.",
+        "visual": "Скан отчёта SEC, зум на строку 'Stored Value Card Liabilities: $1.77B'"
+      },
+      {
+        "name": "Интервенция остановки",
+        "goal": "Паттерн-интеррапт",
+        "text": "Но подождите. Это не строка про кофе.",
+        "visual": "Резкий зум, смена цветокоррекции на красный, звук скретча"
+      },
+      {
+        "name": "Контрарный отскок",
+        "goal": "Создание разрыва (Curiosity Gap)",
+        "text": "Эта цифра означает, что вы дали Starbucks почти 2 миллиарда долларов в долг. Без процентов. Добровольно. И вот почему это проблема.",
+        "visual": "Инфографика: деньги перетекают от людей в хранилище Starbucks"
+      }
+    ]
+  },
+  "blocks": [],
+  "av_lines": [
+    {
+      "timecode": "00:00",
+      "audio_text": "Посмотрите на этот отчёт Starbucks.",
+      "visual_description": "Скан SEC-отчёта, зум на цифру",
+      "visual_type": "document",
+      "sfx": "paper rustle",
+      "music_mood": "ambient тревожный"
+    },
+    {
+      "timecode": "00:03",
+      "audio_text": "Но подождите. Это не про кофе.",
+      "visual_description": "Snap Zoom на лицо, красный фильтр",
+      "visual_type": "snap_zoom",
+      "sfx": "scratch sound",
+      "music_mood": ""
+    },
+    {
+      "timecode": "00:05",
+      "audio_text": "Вы дали им 2 миллиарда в долг.",
+      "visual_description": "Инфографика: деньги текут",
+      "visual_type": "text_overlay",
+      "sfx": "whoosh",
+      "music_mood": "driving beat"
+    },
+    {
+      "timecode": "00:10",
+      "audio_text": "И вот почему это проблема.",
+      "visual_description": "B-Roll: люди в очереди Starbucks",
+      "visual_type": "b-roll",
+      "sfx": "",
+      "music_mood": "driving beat"
+    },
+    {
+      "timecode": "00:15",
+      "audio_text": "По сути, Starbucks — это банк.",
+      "visual_description": "Сравнительная карта депозитов",
+      "visual_type": "map",
+      "sfx": "paper rustle",
+      "music_mood": "ambient нарастающий"
+    },
+    {
+      "timecode": "00:22",
+      "audio_text": "На самом деле, схема гениальна.",
+      "visual_description": "Схема движения денег, анимация",
+      "visual_type": "stock_footage",
+      "sfx": "typewriter click",
+      "music_mood": "epic пиано"
+    }
+  ]
+}
