@@ -3,11 +3,11 @@ export const APP_VERSION = '1.0';
 
 // --- PER-AGENT MODEL MAPPING (display only — backend handles actual calls) ---
 export const AGENT_MODELS = {
-  SCOUT:     'gemini-2.0-flash',
-  RADAR:     'gemini-2.0-flash',
-  ANALYST:   'gemini-2.0-flash',
-  ARCHITECT: 'gemini-2.0-flash',
-  WRITER:    'gemini-2.0-flash',
+  SCOUT:     'gemini-3-flash-preview',
+  RADAR:     'gemini-3-flash-preview',
+  ANALYST:   'gemini-3-pro-preview',
+  ARCHITECT: 'gemini-3-flash-preview',
+  WRITER:    'gemini-3-pro-preview',
 } as const;
 
 // --- TIMING CONFIG ---

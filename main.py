@@ -43,16 +43,18 @@ PORT = int(os.getenv("BACKEND_PORT", "8000"))
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 # Per-agent model mapping — override via env: MODEL_SCOUT, MODEL_RADAR, etc.
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gemini-2.0-flash")
+FLASH_MODEL = "gemini-3-flash-preview"
+PRO_MODEL = "gemini-3-pro-preview"
+
 AGENT_MODELS = {
-    "SCOUT":     os.getenv("MODEL_SCOUT", DEFAULT_MODEL),
-    "RADAR":     os.getenv("MODEL_RADAR", DEFAULT_MODEL),
-    "ANALYST":   os.getenv("MODEL_ANALYST", DEFAULT_MODEL),
-    "ARCHITECT": os.getenv("MODEL_ARCHITECT", DEFAULT_MODEL),
-    "WRITER":    os.getenv("MODEL_WRITER", DEFAULT_MODEL),
+    "SCOUT":     os.getenv("MODEL_SCOUT", FLASH_MODEL),
+    "RADAR":     os.getenv("MODEL_RADAR", FLASH_MODEL),
+    "ANALYST":   os.getenv("MODEL_ANALYST", PRO_MODEL),
+    "ARCHITECT": os.getenv("MODEL_ARCHITECT", FLASH_MODEL),
+    "WRITER":    os.getenv("MODEL_WRITER", PRO_MODEL),
 }
 
-IMAGE_GEN_MODEL = os.getenv("MODEL_IMAGE", "gemini-2.0-flash-exp")
+IMAGE_GEN_MODEL = os.getenv("MODEL_IMAGE", FLASH_MODEL)
 IMAGE_PROMPT_PREFIX = "Cinematic storyboard frame, high contrast, cyber noir documentary style. SCENE:"
 
 RETRY_COUNT = 3
