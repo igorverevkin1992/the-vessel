@@ -271,18 +271,22 @@ TARGET SPECIFICATIONS:
 - MINIMUM: 2500 WORDS of narration
 - MINIMUM: 60 BLOCKS (rows)
 
-STACCATO WRITING RULES:
-- Sentences <= 8 words. Clipped rhythm. Punchy delivery.
-- Harris connectors: "basically", "honestly", "actually", "look at this", "here's the thing"
-- Deictic drivers: point to visuals in EVERY Evidence Loop ("look at this document", "see this number here", "watch what happens next")
-- Rhetorical questions to create micro-engagement pauses
+WRITING STYLE — VIDEO ESSAY NARRATION:
+This is a VIDEO ESSAY, not a TikTok. Write natural, flowing, connected prose that sounds like an intelligent person explaining something fascinating to a friend.
+- Write in complete, well-constructed sentences. Vary sentence length naturally — some short for emphasis, most medium-length for clarity, occasionally longer for building complex arguments.
+- Use natural transitions and logical connectors: "and the reason this matters is...", "but here's where it gets interesting...", "so what does this actually mean?", "now, if you look at this from a different angle..."
+- Harris-style conversational markers (use sparingly, not every sentence): "basically", "honestly", "here's the thing", "look at this", "actually"
+- Deictic drivers to connect narration to visuals: "look at this document", "see this number here", "watch what happens when we compare these two"
+- Rhetorical questions to engage the viewer: "So why would they do this?", "And what happened next?"
+- The tone is: curious, investigative, sometimes frustrated, always intelligent. Think of a documentary narrator who genuinely cares about the topic.
+- IMPORTANT: Do NOT write choppy, fragmented sentences. Do NOT make every sentence under 8 words. This should sound like a real person speaking coherently, not a telegram.
 
 HOOK RULES:
 1. NO "HI GUYS": Do NOT write "Hey everyone". Start IMMEDIATELY with the hook.
 2. NO "IN THIS VIDEO": Don't explain what you'll do. Just DO it.
-3. HOST = human: vulnerable, curious, frustrated. Rhetorical questions, dramatic pauses.
+3. HOST = human: vulnerable, curious, frustrated. A person who discovered something and needs to share it.
 4. INTERACTIVITY: Ask the audience to comment/like at a natural emotional peak (not forced).
-5. SCREEN TEXT: Key phrases, numbers, and shocking facts MUST appear as text overlays.
+5. SCREEN TEXT: Key phrases, numbers, and shocking facts should appear as text overlays.
 6. NO LONG GOODBYE: Ending <= 3 seconds. Smash cut to black. Leave them thinking.
 
 EVIDENCE LOOP STRUCTURE (repeat throughout):
@@ -295,12 +299,12 @@ VISUAL LOGIC:
 - Music: ambient drone → driving beat → epic piano → silence (for impact)
 
 ORGANIC TIMING:
-- Do NOT use fixed 15-second blocks
-- Vary: 3s, 45s, 12s, 8s, 30s. Constantly shift rhythm.
+- Do NOT use fixed 15-second blocks.
+- Vary block lengths naturally: 3s, 45s, 12s, 8s, 30s.
 - Hook blocks: short (3-5s). Investigation blocks: longer (20-45s). Transitions: quick (2-5s).
 
 LANGUAGE — ALL IN ENGLISH:
-- audioScript: English narration (the spoken word)
+- audioScript: English narration (the spoken word — must sound natural when read aloud)
 - russianScript: English screen text / subtitle overlay (key phrases, numbers, quotes that appear on screen)
 - visualCue: English production direction for the editor
 
@@ -316,7 +320,7 @@ RESPONSE FORMAT — JSON array (MINIMUM 60 objects):
   {
     "timecode": "00:00 - 00:05",
     "visualCue": "[HOST] Close-up. Tense expression. Holding a document.",
-    "audioScript": "Look at this document.",
+    "audioScript": "I found something that changes everything we thought we knew about this.",
     "russianScript": "CLASSIFIED — DO NOT DISTRIBUTE",
     "blockType": "INTRO"
   },
