@@ -15,7 +15,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
       {lines.map((line, idx) => {
         const trimmed = line.trim();
 
-        if (trimmed.startsWith('///') || trimmed.startsWith('===') || trimmed.startsWith('STEP') || trimmed.startsWith('ШАГ')) {
+        if (trimmed.startsWith('///') || trimmed.startsWith('===') || trimmed.startsWith('STEP')) {
           return (
             <h4 key={idx} className="text-cn-cyan font-bold uppercase tracking-wider mt-4 mb-2 text-xs border-b border-cn-cyan/20 pb-1">
               {trimmed.replace(/[/=]/g, '').trim()}

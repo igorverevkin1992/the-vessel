@@ -122,7 +122,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
         <div class="visual">VISUAL: ${escapeHtml(block.visualCue)}</div>
         ${block.imageUrl ? `<div class="img-container"><img class="storyboard" src="${escapeHtml(block.imageUrl)}" alt="Storyboard Frame" style="width: 600px; height: auto;" /></div>` : ''}
         <div class="audio">AUDIO (EN): ${escapeHtml(block.audioScript)}</div>
-        <div class="russian">AUDIO (RU): ${escapeHtml(block.russianScript)}</div>
+        <div class="russian">SCREEN TEXT: ${escapeHtml(block.russianScript)}</div>
       </div>
     `).join('');
 
@@ -130,7 +130,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   };
 
   const handleExportExcel = () => {
-    const headers = ["Timecode", "Block Type", "Visual Cue", "Audio Script (EN)", "Audio Script (RU)"];
+    const headers = ["Timecode", "Block Type", "Visual Cue", "Audio Script", "Screen Text"];
     const rows = script.map(block => {
       const safeVisual = `"${block.visualCue.replace(/"/g, '""')}"`;
       const safeAudio = `"${block.audioScript.replace(/"/g, '""')}"`;
@@ -194,7 +194,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                 <th className="p-4 w-28">Timing</th>
                 <th className="p-4 w-1/4">Visual (AI Storyboard)</th>
                 <th className="p-4 w-1/3">Audio (EN)</th>
-                <th className="p-4 w-1/3">Audio (RU)</th>
+                <th className="p-4 w-1/3">Screen Text</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-cn-slate/20 font-mono text-sm">

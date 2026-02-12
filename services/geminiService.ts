@@ -1,47 +1,15 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { AGENT_SCOUT_PROMPT, AGENT_A_PROMPT, AGENT_B_PROMPT, AGENT_C_PROMPT, AGENT_D_PROMPT, CHARS_PER_SECOND, MIN_BLOCK_DURATION_SEC, IMAGE_GEN_MODEL, IMAGE_GEN_PROMPT_PREFIX, API_RETRY_COUNT, API_RETRY_BASE_DELAY_MS, AGENT_MODELS } from "../constants";
+/**
+ * Gemini Service — calls the Python backend API.
+ *
+ * Backend: python main.py
+ * Frontend proxies /api/* via Vite dev server.
+ */
+
 import { ResearchDossier, ScriptBlock, TopicSuggestion } from "../types";
 import { logger } from "./logger";
+import { CHARS_PER_SECOND, MIN_BLOCK_DURATION_SEC } from "../constants";
 
-const getClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key is missing. Set GEMINI_API_KEY in .env");
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
-// --- RETRY HELPER ---
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= API_RETRY_COUNT; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      if (attempt < API_RETRY_COUNT) {
-        const waitMs = API_RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
-        logger.warn(`${label}: attempt ${attempt + 1} failed, retrying in ${waitMs}ms`, err);
-        await delay(waitMs);
-      }
-    }
-  }
-  throw lastError;
-}
-
-// --- SAFE JSON PARSER ---
-
-function safeJsonParse<T>(text: string, label: string): T {
-  try {
-    return JSON.parse(text) as T;
-  } catch (err) {
-    logger.error(`${label}: Failed to parse JSON response`, { text: text.substring(0, 200), err });
-    throw new Error(`${label}: Invalid JSON response from API`, { cause: err });
-  }
-}
+const API_BASE = "/api";
 
 // --- TIMING CALCULATION MODULE ---
 
@@ -129,185 +97,73 @@ const calculateDurationAndRetiming = (script: ScriptBlock[]): ScriptBlock[] => {
   });
 };
 
+// --- HELPER ---
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
 // --- AGENT FUNCTIONS ---
 
-const getToolsForModel = (model: string) => {
-  if (model.includes('gemini-3')) {
-    return [{ googleSearch: {} }];
-  }
-  return undefined;
-};
-
 export const runScoutAgent = async (): Promise<TopicSuggestion[]> => {
-  const model = AGENT_MODELS.SCOUT;
-  return withRetry(async () => {
-    const ai = getClient();
-    const tools = getToolsForModel(model);
-
-    const response = await ai.models.generateContent({
-      model,
-      contents: AGENT_SCOUT_PROMPT,
-      config: {
-        tools,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              hook: { type: Type.STRING },
-              viralFactor: { type: Type.STRING }
-            },
-            required: ["title", "hook", "viralFactor"]
-          }
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) throw new Error("Scout returned empty intel.");
-    return safeJsonParse<TopicSuggestion[]>(text, 'Scout');
-  }, 'runScoutAgent');
+  logger.info("Scout: calling backend...");
+  return apiFetch<TopicSuggestion[]>(`${API_BASE}/scout`, { method: "POST" });
 };
 
 export const runRadarAgent = async (topic: string): Promise<string> => {
-  const model = AGENT_MODELS.RADAR;
-  return withRetry(async () => {
-    const ai = getClient();
-    const response = await ai.models.generateContent({
-      model,
-      contents: `ТЕМА: ${topic}\n\n${AGENT_A_PROMPT}`,
-      config: { temperature: 0.7 }
-    });
-    return response.text || "Radar failed to acquire target.";
-  }, 'runRadarAgent');
+  logger.info("Radar: calling backend...");
+  const data = await apiFetch<{ result: string }>(`${API_BASE}/radar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic }),
+  });
+  return data.result;
 };
 
 export const runAnalystAgent = async (topic: string, radarAnalysis: string): Promise<ResearchDossier> => {
-  const model = AGENT_MODELS.ANALYST;
-  return withRetry(async () => {
-    const ai = getClient();
-    const tools = getToolsForModel(model);
-
-    const response = await ai.models.generateContent({
-      model,
-      contents: `ТЕМА: ${topic}\n\nАНАЛИЗ РАДАРА: ${radarAnalysis}\n\n${AGENT_B_PROMPT}`,
-      config: {
-        tools,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            topic: { type: Type.STRING },
-            claims: { type: Type.ARRAY, items: { type: Type.STRING } },
-            counterClaims: { type: Type.ARRAY, items: { type: Type.STRING } },
-            visualAnchors: { type: Type.ARRAY, items: { type: Type.STRING } },
-            dataPoints: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  label: { type: Type.STRING },
-                  value: { type: Type.STRING }
-                },
-                required: ["label", "value"]
-              }
-            }
-          },
-          required: ["topic", "claims", "counterClaims", "visualAnchors", "dataPoints"]
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) throw new Error("Analyst returned empty data.");
-    return safeJsonParse<ResearchDossier>(text, 'Analyst');
-  }, 'runAnalystAgent');
+  logger.info("Analyst: calling backend...");
+  return apiFetch<ResearchDossier>(`${API_BASE}/analyst`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, radarAnalysis }),
+  });
 };
 
 export const runArchitectAgent = async (dossier: ResearchDossier | string): Promise<string> => {
-  const model = AGENT_MODELS.ARCHITECT;
-  return withRetry(async () => {
-    const ai = getClient();
-    const dossierStr = typeof dossier === 'string' ? dossier : JSON.stringify(dossier, null, 2);
-
-    const response = await ai.models.generateContent({
-      model,
-      contents: `ДОСЬЕ: ${dossierStr}\n\n${AGENT_C_PROMPT}`,
-    });
-    return response.text || "Architect failed to build structure.";
-  }, 'runArchitectAgent');
+  logger.info("Architect: calling backend...");
+  const dossierStr = typeof dossier === "string" ? dossier : JSON.stringify(dossier, null, 2);
+  const data = await apiFetch<{ result: string }>(`${API_BASE}/architect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dossier: dossierStr }),
+  });
+  return data.result;
 };
 
 export const runWriterAgent = async (structure: string, dossier: ResearchDossier | string): Promise<ScriptBlock[]> => {
-  const model = AGENT_MODELS.WRITER;
-  return withRetry(async () => {
-    const ai = getClient();
-    const dossierStr = typeof dossier === 'string' ? dossier : JSON.stringify(dossier, null, 2);
-
-    const thinkingConfig = (model.includes('gemini-3') || model.includes('gemini-2.5'))
-      ? { thinkingBudget: 2048 }
-      : undefined;
-
-    const response = await ai.models.generateContentStream({
-      model,
-      contents: `ДОСЬЕ: ${dossierStr}\nСТРУКТУРА: ${structure}\n\n${AGENT_D_PROMPT}`,
-      config: {
-        responseMimeType: "application/json",
-        thinkingConfig,
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              timecode: { type: Type.STRING },
-              visualCue: { type: Type.STRING },
-              audioScript: { type: Type.STRING },
-              russianScript: { type: Type.STRING },
-              blockType: { type: Type.STRING, enum: ['INTRO', 'BODY', 'TRANSITION', 'SALES', 'OUTRO'] }
-            },
-            required: ["timecode", "visualCue", "audioScript", "russianScript", "blockType"]
-          }
-        }
-      }
-    });
-
-    let fullText = '';
-    for await (const chunk of response) {
-      const part = chunk.text;
-      if (part) fullText += part;
-    }
-
-    if (!fullText) throw new Error("Writer returned empty script.");
-
-    const rawScript = safeJsonParse<ScriptBlock[]>(fullText, 'Writer');
-    return calculateDurationAndRetiming(rawScript);
-  }, 'runWriterAgent');
+  logger.info("Writer: calling backend...");
+  const dossierStr = typeof dossier === "string" ? dossier : JSON.stringify(dossier, null, 2);
+  const rawScript = await apiFetch<ScriptBlock[]>(`${API_BASE}/writer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ structure, dossier: dossierStr }),
+  });
+  return calculateDurationAndRetiming(rawScript);
 };
 
 export const generateImageForBlock = async (prompt: string): Promise<string | null> => {
-  const ai = getClient();
   try {
-    const response = await ai.models.generateContent({
-      model: IMAGE_GEN_MODEL,
-      contents: `${IMAGE_GEN_PROMPT_PREFIX} ${prompt}`,
-      config: {
-        imageConfig: {
-          aspectRatio: "16:9"
-        }
-      }
+    const data = await apiFetch<{ imageUrl: string | null }>(`${API_BASE}/generate-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
     });
-
-    const parts = response.candidates?.[0]?.content?.parts;
-    if (!parts) return null;
-
-    for (const part of parts) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-    return null;
+    return data.imageUrl || null;
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
     logger.error("Image generation failed", { message, prompt: prompt.substring(0, 80) });

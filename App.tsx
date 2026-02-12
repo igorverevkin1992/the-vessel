@@ -493,7 +493,7 @@ function App() {
         <div className="lg:col-span-8 space-y-6">
 
           {/* Empty State */}
-          {!state.currentAgent && !state.finalScript && !state.scoutSuggestions && state.currentAgent === 'IDLE' && (
+          {state.currentAgent === 'IDLE' && !state.finalScript && !state.scoutSuggestions && (
              <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-cn-slate/20 rounded-lg p-12 text-center opacity-50">
                <div className="text-6xl mb-4">&#x1F310;</div>
                <h2 className="text-2xl font-bold mb-2">Awaiting Directive</h2>
