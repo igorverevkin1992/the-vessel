@@ -1,8 +1,8 @@
 /**
- * Gemini Service — вызывает Python backend API вместо Gemini напрямую.
+ * Gemini Service — calls the Python backend API.
  *
- * Backend запускается через: python main.py
- * Фронтенд проксирует /api/* через Vite dev server.
+ * Backend: python main.py
+ * Frontend proxies /api/* via Vite dev server.
  */
 
 import { ResearchDossier, ScriptBlock, TopicSuggestion } from "../types";
@@ -111,12 +111,12 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 // --- AGENT FUNCTIONS ---
 
 export const runScoutAgent = async (): Promise<TopicSuggestion[]> => {
-  logger.info("Scout: вызов бэкенда...");
+  logger.info("Scout: calling backend...");
   return apiFetch<TopicSuggestion[]>(`${API_BASE}/scout`, { method: "POST" });
 };
 
 export const runRadarAgent = async (topic: string): Promise<string> => {
-  logger.info("Radar: вызов бэкенда...");
+  logger.info("Radar: calling backend...");
   const data = await apiFetch<{ result: string }>(`${API_BASE}/radar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -126,7 +126,7 @@ export const runRadarAgent = async (topic: string): Promise<string> => {
 };
 
 export const runAnalystAgent = async (topic: string, radarAnalysis: string): Promise<ResearchDossier> => {
-  logger.info("Analyst: вызов бэкенда...");
+  logger.info("Analyst: calling backend...");
   return apiFetch<ResearchDossier>(`${API_BASE}/analyst`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -135,7 +135,7 @@ export const runAnalystAgent = async (topic: string, radarAnalysis: string): Pro
 };
 
 export const runArchitectAgent = async (dossier: ResearchDossier | string): Promise<string> => {
-  logger.info("Architect: вызов бэкенда...");
+  logger.info("Architect: calling backend...");
   const dossierStr = typeof dossier === "string" ? dossier : JSON.stringify(dossier, null, 2);
   const data = await apiFetch<{ result: string }>(`${API_BASE}/architect`, {
     method: "POST",
@@ -146,7 +146,7 @@ export const runArchitectAgent = async (dossier: ResearchDossier | string): Prom
 };
 
 export const runWriterAgent = async (structure: string, dossier: ResearchDossier | string): Promise<ScriptBlock[]> => {
-  logger.info("Writer: вызов бэкенда...");
+  logger.info("Writer: calling backend...");
   const dossierStr = typeof dossier === "string" ? dossier : JSON.stringify(dossier, null, 2);
   const rawScript = await apiFetch<ScriptBlock[]>(`${API_BASE}/writer`, {
     method: "POST",

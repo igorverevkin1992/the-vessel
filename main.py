@@ -2,11 +2,11 @@
 """
 Smart Blockbuster — Backend API Server
 
-Запуск:
+Launch:
     python main.py
 
-Сервер принимает запросы от фронтенда и вызывает Google Gemini API.
-Прогресс каждого агента отображается в консоли.
+The server receives requests from the frontend and calls the Google Gemini API.
+Each agent's progress is displayed in the console with color-coded output.
 
 Endpoints:
     POST /api/scout              -> TopicSuggestion[]
@@ -21,7 +21,6 @@ import os
 import sys
 import json
 import time
-import base64
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -35,7 +34,7 @@ import uvicorn
 
 
 # ═══════════════════════════════════════════════════════════════
-# КОНФИГУРАЦИЯ
+# CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -43,15 +42,17 @@ PORT = int(os.getenv("BACKEND_PORT", "8000"))
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
+# Per-agent model mapping — override via env: MODEL_SCOUT, MODEL_RADAR, etc.
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gemini-2.0-flash")
 AGENT_MODELS = {
-    "SCOUT":     "gemini-2.0-flash",
-    "RADAR":     "gemini-2.0-flash",
-    "ANALYST":   "gemini-2.5-flash-preview-05-20",
-    "ARCHITECT": "gemini-2.0-flash",
-    "WRITER":    "gemini-2.5-flash-preview-05-20",
+    "SCOUT":     os.getenv("MODEL_SCOUT", DEFAULT_MODEL),
+    "RADAR":     os.getenv("MODEL_RADAR", DEFAULT_MODEL),
+    "ANALYST":   os.getenv("MODEL_ANALYST", DEFAULT_MODEL),
+    "ARCHITECT": os.getenv("MODEL_ARCHITECT", DEFAULT_MODEL),
+    "WRITER":    os.getenv("MODEL_WRITER", DEFAULT_MODEL),
 }
 
-IMAGE_GEN_MODEL = "gemini-2.0-flash-exp"
+IMAGE_GEN_MODEL = os.getenv("MODEL_IMAGE", "gemini-2.0-flash-exp")
 IMAGE_PROMPT_PREFIX = "Cinematic storyboard frame, high contrast, cyber noir documentary style. SCENE:"
 
 RETRY_COUNT = 3
@@ -59,7 +60,7 @@ RETRY_BASE_DELAY = 1.0
 
 
 # ═══════════════════════════════════════════════════════════════
-# КОНСОЛЬНЫЙ ВЫВОД (цвета + время)
+# CONSOLE OUTPUT (colors + timestamps)
 # ═══════════════════════════════════════════════════════════════
 
 class C:
@@ -100,173 +101,223 @@ def log_separator(title: str = ""):
 
 
 # ═══════════════════════════════════════════════════════════════
-# ПРОМПТЫ АГЕНТОВ (идентичны constants.ts)
+# AGENT PROMPTS — Smart Blockbuster Methodology
+# Synthesis of Kalloway (algorithmic retention) + Harris (visual journalism)
 # ═══════════════════════════════════════════════════════════════
 
 AGENT_SCOUT_PROMPT = """
-Ты — АГЕНТ СКАУТ (РАЗВЕДКА) системы «Умный Блокбастер».
-Миссия: сканировать информационное поле и найти 4 темы для YouTube-видео по методологии синтеза Кэллоуэя + Харриса.
+You are AGENT SCOUT of the Smart Blockbuster system.
+Mission: scan the information landscape and find 4 topics for YouTube videos using the Kalloway + Harris synthesis methodology.
 
-ФОКУС КАНАЛА:
-- Расследования (скрытые механизмы, заговоры систем)
-- Эксплейнеры (сложные объекты через простые метафоры)
-- Геополитика (карты как персонажи, аномалии на границах)
-- Бизнес (System Failure — когда компания = не то, чем кажется)
+CHANNEL FOCUS (content types):
+- INVESTIGATION: Hidden mechanisms, system conspiracies, follow-the-money trails. Hook archetype: Investigator ("I found a document they were hiding from you").
+- EXPLAINER: Complex systems explained through simple metaphors. Hook archetype: Teacher ("How this complex thing works — through a simple metaphor") or Magician ("Visualizing the invisible — radiation, flows, traffic").
+- GEOPOLITICS: Maps as characters, border anomalies, shifting alliances. Hook archetype: Fortune Teller ("This 1929 chart matches today's pattern exactly").
+- BUSINESS: System Failure — when a company is not what it seems. Hook archetype: Contrarian ("This isn't a mistake — it's the System's intent").
 
-КРИТИЧЕСКАЯ ИНСТРУКЦИЯ — GOOGLE SEARCH:
-Ты ОБЯЗАН использовать Google Search для поиска ТЕКУЩИХ новостей за последние 48 часов. НЕ предлагай общие темы. Предлагай конкретные события.
+CRITICAL INSTRUCTION — GOOGLE SEARCH:
+You MUST use Google Search to find CURRENT news from the last 48 hours. Do NOT suggest generic evergreen topics. Suggest specific, recent events that can be turned into compelling videos.
 
-6 АРХЕТИПОВ ХУКОВ (выбери наиболее подходящий):
-- Следователь ("Я нашёл документ, который от вас скрывали")
-- Противник ("Это не ошибка — это умысел Системы")
-- Волшебник ("Визуализация невидимого — радиация, потоки, трафик")
-- Предсказатель ("Этот график 1929 года совпадает с сегодняшним")
-- Экспериментатор ("Я поехал в опасное место, чтобы вам не пришлось")
-- Учитель ("Как работает сложный объект — через простую метафору")
+6 HOOK ARCHETYPES (choose the most fitting for each topic):
+1. Investigator — "I found a document they were hiding from you"
+2. Contrarian — "This isn't a bug — it's the System's feature"
+3. Magician — "Visualizing the invisible — radiation, money flows, traffic"
+4. Fortune Teller — "This 1929 chart matches today's pattern"
+5. Experimenter — "I went to a dangerous place so you don't have to"
+6. Teacher — "How a complex thing works — through a simple metaphor"
 
-ФОРМАТ ОТВЕТА:
-Верни JSON-массив из 4 объектов:
-- "title": Провокационный заголовок < 60 символов
-- "hook": Одно предложение — конкретное событие-триггер
-- "viralFactor": Вирусный фактор (Страх/FOMO, Справедливость/Гнев, Деньги/Выгода, Секрет/Инсайд)
+4 VIRAL TRIGGERS (assign the strongest one):
+- Fear / FOMO: "If you don't know this — you've already lost"
+- Justice / Outrage: "The system is cheating you — here's the proof"
+- Money / Profit: "Here's how much you're losing every day"
+- Secret / Insider: "The document they were hiding from you"
+
+RESPONSE FORMAT:
+Return a JSON array of exactly 4 objects:
+[
+  {
+    "title": "Provocative headline under 60 chars, CAPS on key words",
+    "hook": "One sentence — the specific triggering event",
+    "viralFactor": "Fear/FOMO | Justice/Outrage | Money/Profit | Secret/Insider"
+  }
+]
 """
 
 AGENT_RADAR_PROMPT = """
-Ты — АГЕНТ РАДАР системы «Умный Блокбастер».
-Твоя задача: применить Дофаминовую лестницу Кэллоуэя и определить вирусные углы.
+You are AGENT RADAR of the Smart Blockbuster system.
+Your task: apply Kalloway's Dopamine Ladder and determine viral angles for maximum audience retention.
 
-МЕТОДОЛОГИЯ — ДОФАМИНОВАЯ ЛЕСТНИЦА (6 уровней):
-1. Стимуляция (0-2 сек): Визуальный шокер — остановка пальца
-2. Пленение (2-10 сек): Когнитивный диссонанс, открытая петля
-3. Предвкушение (основная часть): Дофамин ожидания награды
-4. Валидация (закрытие петель): Ответ лучше ожидаемого
-5. Симпатия: Парасоциальная связь с автором
-6. Откровение: Перформативная уязвимость
+METHODOLOGY — DOPAMINE LADDER (6 levels):
+1. STIMULATION (0-2 sec): Visual shocker — thumb-stop moment. Pattern interrupt.
+2. CAPTIVATION (2-10 sec): Cognitive dissonance, open loop. "Wait, what?"
+3. ANTICIPATION (main body): Dopamine of reward expectation. Serrated edge keeps tension.
+4. VALIDATION (closing loops): The answer is BETTER than expected. Micro-reveals.
+5. AFFECTION: Parasocial bond with the host. Vulnerability, shared frustration.
+6. REVELATION: Performative vulnerability. "I didn't want to believe this either."
 
-ВИРУСНЫЕ ТРИГГЕРЫ:
-1. Страх / FOMO ("Если вы не знаете это — вы уже проиграли")
-2. Справедливость / Гнев ("Система обманывает вас — вот доказательство")
-3. Деньги / Выгода ("Вот сколько вы теряете каждый день")
-4. Секрет / Инсайд ("Документ, который от вас скрывали")
+4 VIRAL TRIGGERS:
+1. Fear / FOMO — "If you don't know this — you've already lost"
+2. Justice / Outrage — "The system is cheating you — here's the proof"
+3. Money / Profit — "Here's how much you're losing every day"
+4. Secret / Insider — "The document they were hiding from you"
 
-ФОРМАТ ОТВЕТА:
-Выведи:
-/// ВИРУСНЫЕ УГЛЫ
-3 гипотезы видео (формат: "Если [событие], то [последствие для зрителя]")
+CONTRARIAN SNAPBACK:
+Formulate a "You think X, but actually Y" statement that creates a Curiosity Gap.
+This is the third step of the 3-Step Hook Formula.
 
-/// ДОФАМИНОВЫЕ КРЮЧКИ
-4-5 конкретных приёмов удержания
+RESPONSE FORMAT:
+Output structured sections:
 
-/// ЦЕЛЕВАЯ ЭМОЦИЯ
-Какую эмоцию эксплуатируем и почему
+/// VIRAL ANGLES
+3 video hypotheses (format: "If [event], then [consequence for the viewer]")
 
-/// КОНТРАРНЫЙ ОТСКОК
-Формулировка "Вы думаете X, но на самом деле Y"
+/// DOPAMINE HOOKS
+4-5 specific retention techniques mapped to Dopamine Ladder levels
+
+/// TARGET EMOTION
+Which emotion we exploit and why (tie to viral trigger)
+
+/// CONTRARIAN SNAPBACK
+"You think X, but actually Y" — the core Curiosity Gap
+
+/// HOOK FORMULA (3 steps)
+1. Context Lean-in + Visual Anchor (Frame 0)
+2. Scroll Stop Interjection — pattern interrupt
+3. Contrarian Snapback — Curiosity Gap opener
 """
 
 AGENT_ANALYST_PROMPT = """
-Ты — АГЕНТ АНАЛИТИК системы «Умный Блокбастер».
-Цель: создать исследовательское досье по методологии Харриса (визуальная журналистика).
+You are AGENT ANALYST of the Smart Blockbuster system.
+Goal: compile a research dossier using Harris's visual journalism methodology.
 
-КРИТИЧНО: ИСПОЛЬЗУЙ GOOGLE SEARCH.
-Ты ОБЯЗАН верифицировать каждое утверждение через поиск.
-- НИКОГДА не говори "недавно". ГОВОРИ "14 октября 2023 года".
-- НИКОГДА не говори "много денег". ГОВОРИ "$4.2 млрд".
-- НИКОГДА не говори "чиновники заявили". ГОВОРИ "Джон Кирби заявил на брифинге во вторник..."
+CRITICAL: USE GOOGLE SEARCH.
+You MUST verify every claim through search.
+- NEVER say "recently". SAY "on October 14, 2023".
+- NEVER say "a lot of money". SAY "$4.2 billion".
+- NEVER say "officials said". SAY "John Kirby stated at Tuesday's briefing..."
 
-ПРОТОКОЛ ДВУХВЕКТОРНОГО ПОИСКА:
-1. ОСНОВНЫЕ ИСТОЧНИКИ: мейнстрим, официальные данные, отчёты
-2. АЛЬТЕРНАТИВНЫЕ ИСТОЧНИКИ: независимые расследования, утечки, контр-нарратив
+TWO-VECTOR RESEARCH PROTOCOL:
+1. MAINSTREAM SOURCES: official data, government reports, major outlets
+2. ALTERNATIVE SOURCES: independent investigations, leaks, counter-narratives
 
-ВИЗУАЛЬНЫЕ ЯКОРЯ (метод Харриса):
-- НАЙДИ конкретные документы, карты, спутниковые снимки, физические локации
-- НАЙДИ контрастные данные: официальная версия vs реальность
-- Минимум 7 визуальных якорей
+VISUAL ANCHORS (Harris method):
+Find concrete physical proof that can be SHOWN on screen:
+- Official documents, declassified files, court filings
+- Maps, satellite imagery, geographic data
+- Charts, graphs, data visualizations
+- Physical locations, buildings, infrastructure
+- Contrasting data: official version vs. reality
+- Minimum 7 visual anchors
 
-ФОРМАТ ОТВЕТА — JSON объект:
+EVIDENCE LOOPS (core storytelling unit):
+Each loop follows: Context → Deictic Driver → Visual Anchor → Micro-Reveal → But/Therefore Transition
+Prepare at least 3 evidence loops with specific data.
+
+NARRATIVE ROLES:
+- VILLAIN (The System): Identify the systemic force causing harm
+- VICTIM (The Viewer): How does this affect the audience personally?
+- SHOCKING ARTIFACT: One single document/image that makes the viewer say "Wait, WHAT?"
+
+RESPONSE FORMAT — JSON object:
 {
-  "topic": "Название темы",
-  "claims": ["Утверждение 1 (Источник, Дата)", "Утверждение 2..."],
-  "counterClaims": ["Контр-утверждение 1 (Источник, Дата)", "..."],
-  "visualAnchors": ["Документ/карта 1", "...", "...", "...", "...", "...", "Якорь 7"],
-  "dataPoints": [{ "label": "Ключевая цифра", "value": "Значение" }]
+  "topic": "Topic name",
+  "claims": ["Claim 1 (Source, Date)", "Claim 2 (Source, Date)", ...],
+  "counterClaims": ["Counter-claim 1 (Source, Date)", ...],
+  "visualAnchors": ["Document/map 1", "Satellite image 2", ..., "Anchor 7+"],
+  "dataPoints": [{"label": "Key metric", "value": "Specific number"}]
 }
 """
 
 AGENT_ARCHITECT_PROMPT = """
-Ты — АГЕНТ АРХИТЕКТОР системы «Умный Блокбастер».
-Ты проектируешь структуру видео по формуле синтеза Кэллоуэя + Харриса.
+You are AGENT ARCHITECT of the Smart Blockbuster system.
+You design the video structure using the Kalloway + Harris synthesis formula.
 
-ПРИНЦИП: "УПАКОВКА ПЕРВОЙ" (Packaging First).
-Сначала проектируешь Превью и Заголовок, ПОТОМ структуру. Видео — это верификация обещания заголовка.
+PRINCIPLE: "PACKAGING FIRST"
+Design the Thumbnail and Title FIRST, then the structure. The video is a verification of the title's promise.
 
-ШАГ 1: УПАКОВКА (Хук)
-- Заголовок: < 60 символов, провокационный. Caps Lock на ключевых словах.
-- Превью: "Правило левого нижнего угла". Высокий контраст. Одна точка фокуса.
-- Трёхшаговый хук (3-5 секунд):
-  1. Контекстное вовлечение + Визуальный якорь (кадр 0)
-  2. Интервенция остановки (Scroll Stop) — паттерн-интеррапт
-  3. Контрарный отскок (Curiosity Gap)
+STEP 1: PACKAGING (The Hook)
+- Title: < 60 characters, provocative. CAPS LOCK on key words.
+- Thumbnail: "Bottom-left corner rule". High contrast. Single focus point. Face + emotion + mysterious object.
+- 3-Step Hook (first 3-5 seconds):
+  1. Context Lean-in + Visual Anchor (Frame 0) — the host holding/pointing at something
+  2. Scroll Stop Interjection — pattern interrupt, unexpected visual or statement
+  3. Contrarian Snapback — "You think X, but actually Y" (Curiosity Gap)
 
-ШАГ 2: ЗУБЧАТАЯ ДУГА (12-15 минут)
-- Высокий старт (00:00-01:00): Хук + Value Compression. Интенсивность 90-100%.
-- Контекстный мост (01:00-03:00): Предпосылки. Интенсивность 30-40%.
-- Расследование (середина): Блоки по 2-3 мин. Перезацеп каждые 2-3 мин.
-- Синтез (финал): Нюансированный ответ + открытый этический вопрос.
+STEP 2: SERRATED EDGE STRUCTURE (12-15 minutes)
+NOT a bell curve. A jagged, tension-maintaining structure:
+- HIGH START (00:00-01:00): Hook + Value Compression. Intensity 90-100%.
+- CONTEXT BRIDGE (01:00-03:00): Background/prerequisites. Intensity drops to 30-40%.
+- RE-HOOK every 2-3 minutes: New open loop, mini-cliffhanger, pattern interrupt.
+- INVESTIGATION (middle): Evidence Loop blocks, each 2-3 min. But/Therefore transitions.
+- SYNTHESIS (finale): Nuanced answer + open ethical question. No neat bow.
 
-ШАГ 3: ЦЕПОЧКА BUT/THEREFORE
-Строй сценарий по принципу South Park: НО / СЛЕДОВАТЕЛЬНО вместо И ЗАТЕМ.
+STEP 3: BUT/THEREFORE CHAIN
+Build the narrative using the South Park principle:
+Replace "AND THEN" with "BUT" (conflict) and "THEREFORE" (consequence).
+Every transition must create momentum, not just sequence.
 
-ФОРМАТ:
-1. ПЛАН УПАКОВКИ (Заголовок, Превью, Хук)
-2. СТРУКТУРНЫЙ ПЛАН (Таймкодированные блоки с описанием)
-3. ЦЕПОЧКА BUT/THEREFORE
+RESPONSE FORMAT:
+1. PACKAGING PLAN (Title, Thumbnail concept, 3-Step Hook script)
+2. STRUCTURAL PLAN (Timecoded blocks with descriptions and intensity levels)
+3. BUT/THEREFORE CHAIN (the full narrative logic chain)
 """
 
 AGENT_WRITER_PROMPT = """
-Ты — АГЕНТ СЦЕНАРИСТ системы «Умный Блокбастер».
-Пишешь финальный двухколоночный A/V сценарий по методологии синтеза Кэллоуэя + Харриса.
+You are AGENT WRITER of the Smart Blockbuster system.
+Write the final two-column A/V script using the Kalloway + Harris synthesis methodology.
 
-ЦЕЛЕВЫЕ ХАРАКТЕРИСТИКИ:
-- ДЛИТЕЛЬНОСТЬ: 12-15 минут
-- МИНИМУМ: 2500 СЛОВ
-- МИНИМУМ: 60 БЛОКОВ (строк)
+TARGET SPECIFICATIONS:
+- DURATION: 12-15 minutes
+- MINIMUM: 2500 WORDS of narration
+- MINIMUM: 60 BLOCKS (rows)
 
-СТИЛИСТИЧЕСКИЕ ПРАВИЛА (Стаккато):
-- Предложения ≤ 8 слов. Рубленый ритм.
-- Коннекторы Харриса: "по сути", "честно говоря", "на самом деле", "посмотрите"
-- Дейктические драйверы: указание на визуал в каждой Петле Доказательства
+STACCATO WRITING RULES:
+- Sentences <= 8 words. Clipped rhythm. Punchy delivery.
+- Harris connectors: "basically", "honestly", "actually", "look at this", "here's the thing"
+- Deictic drivers: point to visuals in EVERY Evidence Loop ("look at this document", "see this number here", "watch what happens next")
+- Rhetorical questions to create micro-engagement pauses
 
-ПРАВИЛА ХУКА:
-1. НЕТ "ПРИВЕТ": Не пиши "Привет друзья". Начинай СРАЗУ с хука.
-2. НЕТ "В ЭТОМ ВИДЕО": Не объясняй что будешь делать. Просто делай.
-3. ВЕДУЩИЙ = человек: уязвимый, любопытный. Риторические вопросы, паузы.
-4. ИНТЕРАКТИВНОСТЬ: Попроси аудиторию комментировать/лайкнуть.
-5. ТЕКСТ НА ЭКРАНЕ: Ключевые фразы должны появляться как оверлей.
-6. НЕТ ДЛИННЫХ ПРОЩАНИЙ: Финал ≤ 3 секунды. Чёрный экран.
+HOOK RULES:
+1. NO "HI GUYS": Do NOT write "Hey everyone". Start IMMEDIATELY with the hook.
+2. NO "IN THIS VIDEO": Don't explain what you'll do. Just DO it.
+3. HOST = human: vulnerable, curious, frustrated. Rhetorical questions, dramatic pauses.
+4. INTERACTIVITY: Ask the audience to comment/like at a natural emotional peak (not forced).
+5. SCREEN TEXT: Key phrases, numbers, and shocking facts MUST appear as text overlays.
+6. NO LONG GOODBYE: Ending <= 3 seconds. Smash cut to black. Leave them thinking.
 
-ВИЗУАЛЬНАЯ ЛОГИКА:
-- Pattern Interrupts: смена типа визуала каждые 15-20 секунд
-- Visual Stun Gun: неожиданный визуальный контраст
-- SFX: paper rustle, whoosh, boom hit, scratch sound
-- Музыка: ambient → driving beat → epic piano
+EVIDENCE LOOP STRUCTURE (repeat throughout):
+Context → Deictic Driver ("look at this") → Visual Anchor → Micro-Reveal → But/Therefore Transition
 
-ОРГАНИЧЕСКИЙ ТАЙМИНГ:
-- НЕ ИСПОЛЬЗУЙ фиксированные 15-секундные блоки
-- Варьируй: 3с, 45с, 12с. Постоянно меняй ритм.
+VISUAL LOGIC:
+- Pattern Interrupts: change visual type every 15-20 seconds (talking head → document → map → data → B-roll)
+- Visual Stun Gun: unexpected visual contrast at key moments
+- SFX: paper rustle, whoosh, boom hit, scratch/rewind sound, camera shutter
+- Music: ambient drone → driving beat → epic piano → silence (for impact)
 
-ЯЗЫК:
-- audioScript: АНГЛИЙСКИЙ
-- russianScript: РУССКИЙ (стилистически точный перевод, не робот)
-- visualCue: РУССКИЙ (для монтажёра)
+ORGANIC TIMING:
+- Do NOT use fixed 15-second blocks
+- Vary: 3s, 45s, 12s, 8s, 30s. Constantly shift rhythm.
+- Hook blocks: short (3-5s). Investigation blocks: longer (20-45s). Transitions: quick (2-5s).
 
-ФОРМАТ — JSON массив (МИНИМУМ 60 объектов):
+LANGUAGE — ALL IN ENGLISH:
+- audioScript: English narration (the spoken word)
+- russianScript: English screen text / subtitle overlay (key phrases, numbers, quotes that appear on screen)
+- visualCue: English production direction for the editor
+
+BLOCK TYPES:
+- INTRO: Opening hook, first 60 seconds
+- BODY: Main investigation / evidence loop blocks
+- TRANSITION: Re-hooks, pattern interrupts, But/Therefore pivots
+- SALES: Sponsor integration or CTA (if applicable)
+- OUTRO: Final synthesis + smash cut ending
+
+RESPONSE FORMAT — JSON array (MINIMUM 60 objects):
 [
   {
     "timecode": "00:00 - 00:05",
-    "visualCue": "[ВЕДУЩИЙ] Крупный план. Лицо напряжено.",
+    "visualCue": "[HOST] Close-up. Tense expression. Holding a document.",
     "audioScript": "Look at this document.",
-    "russianScript": "Посмотрите на этот документ.",
+    "russianScript": "CLASSIFIED — DO NOT DISTRIBUTE",
     "blockType": "INTRO"
   },
   ...
@@ -275,14 +326,14 @@ AGENT_WRITER_PROMPT = """
 
 
 # ═══════════════════════════════════════════════════════════════
-# GEMINI REST API CLIENT (без SDK — работает везде)
+# GEMINI REST API CLIENT (no SDK — works everywhere)
 # ═══════════════════════════════════════════════════════════════
 
 def call_gemini(model_name: str, prompt: str, agent_name: str,
                 json_mode: bool = False) -> str:
     """
-    Вызов Gemini REST API с retry и логированием в консоль.
-    Не использует SDK — работает через httpx напрямую.
+    Call Gemini REST API with retry and console logging.
+    Uses httpx directly — no SDK dependency.
     """
     url = f"{GEMINI_BASE_URL}/models/{model_name}:generateContent"
 
@@ -295,15 +346,15 @@ def call_gemini(model_name: str, prompt: str, agent_name: str,
     last_error = None
     for attempt in range(RETRY_COUNT + 1):
         try:
-            retry_msg = f" [попытка {attempt + 1}/{RETRY_COUNT + 1}]" if attempt > 0 else ""
-            log(agent_name, f"Gemini API → {model_name}{retry_msg}")
+            retry_msg = f" [attempt {attempt + 1}/{RETRY_COUNT + 1}]" if attempt > 0 else ""
+            log(agent_name, f"Gemini API -> {model_name}{retry_msg}")
 
             start = time.time()
             resp = httpx.post(
                 url,
                 params={"key": GEMINI_API_KEY},
                 json=body,
-                timeout=300.0,  # 5 минут для Writer
+                timeout=300.0,  # 5 min timeout for Writer agent
             )
             elapsed = time.time() - start
 
@@ -313,10 +364,10 @@ def call_gemini(model_name: str, prompt: str, agent_name: str,
 
             data = resp.json()
 
-            # Извлекаем текст из ответа
+            # Extract text from response
             candidates = data.get("candidates", [])
             if not candidates:
-                raise ValueError("Gemini вернул пустой candidates")
+                raise ValueError("Gemini returned empty candidates")
 
             parts = candidates[0].get("content", {}).get("parts", [])
             text = ""
@@ -325,10 +376,10 @@ def call_gemini(model_name: str, prompt: str, agent_name: str,
                     text += part["text"]
 
             if not text:
-                raise ValueError("Пустой текст в ответе Gemini")
+                raise ValueError("Empty text in Gemini response")
 
             log(agent_name,
-                f"{C.GREEN}✓ Ответ получен{C.RESET} ({elapsed:.1f}с, {len(text)} символов)")
+                f"{C.GREEN}OK{C.RESET} ({elapsed:.1f}s, {len(text)} chars)")
             return text
 
         except Exception as e:
@@ -336,16 +387,16 @@ def call_gemini(model_name: str, prompt: str, agent_name: str,
             if attempt < RETRY_COUNT:
                 wait = RETRY_BASE_DELAY * (2 ** attempt)
                 log("ERROR", f"{agent_name}: {e}")
-                log("ERROR", f"Повтор через {wait:.0f}с...")
+                log("ERROR", f"Retrying in {wait:.0f}s...")
                 time.sleep(wait)
             else:
-                log("ERROR", f"{agent_name}: все {RETRY_COUNT + 1} попытки исчерпаны")
+                log("ERROR", f"{agent_name}: all {RETRY_COUNT + 1} attempts exhausted")
 
     raise last_error
 
 
 def call_gemini_image(prompt: str) -> str | None:
-    """Генерация изображения через Gemini REST API."""
+    """Generate an image via Gemini REST API."""
     url = f"{GEMINI_BASE_URL}/models/{IMAGE_GEN_MODEL}:generateContent"
 
     body = {
@@ -421,8 +472,8 @@ class ImageRequest(BaseModel):
 
 @app.post("/api/scout")
 def scout_endpoint():
-    log_separator("AGENT S: SCOUT — Сканирование тем")
-    log("SCOUT", "Поиск 4 тем для видео...")
+    log_separator("AGENT S: SCOUT — Scanning Topics")
+    log("SCOUT", "Searching for 4 video topics...")
 
     try:
         text = call_gemini(
@@ -433,7 +484,7 @@ def scout_endpoint():
         )
         suggestions = json.loads(text)
 
-        log("SCOUT", f"{C.CYAN}Найдено {len(suggestions)} тем:{C.RESET}")
+        log("SCOUT", f"{C.CYAN}Found {len(suggestions)} topics:{C.RESET}")
         for i, s in enumerate(suggestions, 1):
             log("SCOUT", f"  {i}. {s.get('title', '???')}")
             log("SCOUT", f"     Hook: {s.get('hook', '—')}")
@@ -442,102 +493,102 @@ def scout_endpoint():
         return suggestions
 
     except Exception as e:
-        log("ERROR", f"Scout провалился: {e}")
+        log("ERROR", f"Scout failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/radar")
 def radar_endpoint(req: RadarRequest):
-    log_separator(f"AGENT A: RADAR — «{req.topic[:50]}»")
-    log("RADAR", f"Тема: {req.topic}")
-    log("RADAR", "Анализ вирусных углов (Дофаминовая лестница)...")
+    log_separator(f"AGENT A: RADAR — \"{req.topic[:50]}\"")
+    log("RADAR", f"Topic: {req.topic}")
+    log("RADAR", "Analyzing viral angles (Dopamine Ladder)...")
 
     try:
         text = call_gemini(
             model_name=AGENT_MODELS["RADAR"],
-            prompt=f"ТЕМА: {req.topic}\n\n{AGENT_RADAR_PROMPT}",
+            prompt=f"TOPIC: {req.topic}\n\n{AGENT_RADAR_PROMPT}",
             agent_name="RADAR",
         )
         preview = text[:200].replace('\n', ' ')
-        log("RADAR", f"Превью: {preview}...")
-        log("RADAR", f"{C.GREEN}✓ Анализ вирусных углов завершён{C.RESET}")
+        log("RADAR", f"Preview: {preview}...")
+        log("RADAR", f"{C.GREEN}Viral angle analysis complete{C.RESET}")
         return {"result": text}
 
     except Exception as e:
-        log("ERROR", f"Radar провалился: {e}")
+        log("ERROR", f"Radar failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/analyst")
 def analyst_endpoint(req: AnalystRequest):
-    log_separator(f"AGENT B: ANALYST — Досье «{req.topic[:50]}»")
-    log("ANALYST", f"Тема: {req.topic}")
-    log("ANALYST", f"Данные Радара: {len(req.radarAnalysis)} символов")
-    log("ANALYST", "Двухвекторный поиск + визуальные якоря Харриса...")
+    log_separator(f"AGENT B: ANALYST — Dossier \"{req.topic[:50]}\"")
+    log("ANALYST", f"Topic: {req.topic}")
+    log("ANALYST", f"Radar data: {len(req.radarAnalysis)} chars")
+    log("ANALYST", "Two-vector search + Harris visual anchors...")
 
     try:
         text = call_gemini(
             model_name=AGENT_MODELS["ANALYST"],
-            prompt=f"ТЕМА: {req.topic}\n\nАНАЛИЗ РАДАРА: {req.radarAnalysis}\n\n{AGENT_ANALYST_PROMPT}",
+            prompt=f"TOPIC: {req.topic}\n\nRADAR ANALYSIS: {req.radarAnalysis}\n\n{AGENT_ANALYST_PROMPT}",
             agent_name="ANALYST",
             json_mode=True,
         )
         dossier = json.loads(text)
 
-        log("ANALYST", f"  Утверждений:       {len(dossier.get('claims', []))}")
-        log("ANALYST", f"  Контр-утверждений: {len(dossier.get('counterClaims', []))}")
-        log("ANALYST", f"  Визуальных якорей: {len(dossier.get('visualAnchors', []))}")
-        log("ANALYST", f"  Data points:       {len(dossier.get('dataPoints', []))}")
-        log("ANALYST", f"{C.GREEN}✓ Досье скомпилировано{C.RESET}")
+        log("ANALYST", f"  Claims:         {len(dossier.get('claims', []))}")
+        log("ANALYST", f"  Counter-claims: {len(dossier.get('counterClaims', []))}")
+        log("ANALYST", f"  Visual anchors: {len(dossier.get('visualAnchors', []))}")
+        log("ANALYST", f"  Data points:    {len(dossier.get('dataPoints', []))}")
+        log("ANALYST", f"{C.GREEN}Dossier compiled{C.RESET}")
         return dossier
 
     except Exception as e:
-        log("ERROR", f"Analyst провалился: {e}")
+        log("ERROR", f"Analyst failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/architect")
 def architect_endpoint(req: ArchitectRequest):
-    log_separator("AGENT C: ARCHITECT — Структура видео")
-    log("ARCHITECT", f"Входное досье: {len(req.dossier)} символов")
-    log("ARCHITECT", "Проектирование Зубчатой дуги + Хук + But/Therefore...")
+    log_separator("AGENT C: ARCHITECT — Video Structure")
+    log("ARCHITECT", f"Input dossier: {len(req.dossier)} chars")
+    log("ARCHITECT", "Designing Serrated Edge + Hook + But/Therefore...")
 
     try:
         text = call_gemini(
             model_name=AGENT_MODELS["ARCHITECT"],
-            prompt=f"ДОСЬЕ: {req.dossier}\n\n{AGENT_ARCHITECT_PROMPT}",
+            prompt=f"DOSSIER: {req.dossier}\n\n{AGENT_ARCHITECT_PROMPT}",
             agent_name="ARCHITECT",
         )
         preview = text[:200].replace('\n', ' ')
-        log("ARCHITECT", f"Превью: {preview}...")
-        log("ARCHITECT", f"{C.GREEN}✓ Структура спроектирована{C.RESET}")
+        log("ARCHITECT", f"Preview: {preview}...")
+        log("ARCHITECT", f"{C.GREEN}Structure designed{C.RESET}")
         return {"result": text}
 
     except Exception as e:
-        log("ERROR", f"Architect провалился: {e}")
+        log("ERROR", f"Architect failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/writer")
 def writer_endpoint(req: WriterRequest):
-    log_separator("AGENT D: WRITER — Генерация A/V сценария")
-    log("WRITER", f"Структура: {len(req.structure)} символов")
-    log("WRITER", f"Досье: {len(req.dossier)} символов")
-    log("WRITER", "Генерация 60+ блоков в стиле Стаккато...")
-    log("WRITER", f"{C.DIM}(это может занять 30-120 секунд){C.RESET}")
+    log_separator("AGENT D: WRITER — Generating A/V Script")
+    log("WRITER", f"Structure: {len(req.structure)} chars")
+    log("WRITER", f"Dossier: {len(req.dossier)} chars")
+    log("WRITER", "Generating 60+ blocks in Staccato style...")
+    log("WRITER", f"{C.DIM}(this may take 30-120 seconds){C.RESET}")
 
     try:
         text = call_gemini(
             model_name=AGENT_MODELS["WRITER"],
-            prompt=f"ДОСЬЕ: {req.dossier}\nСТРУКТУРА: {req.structure}\n\n{AGENT_WRITER_PROMPT}",
+            prompt=f"DOSSIER: {req.dossier}\nSTRUCTURE: {req.structure}\n\n{AGENT_WRITER_PROMPT}",
             agent_name="WRITER",
             json_mode=True,
         )
         script = json.loads(text)
 
         word_count = sum(len(b.get("audioScript", "").split()) for b in script)
-        log("WRITER", f"  Блоков:    {len(script)}")
-        log("WRITER", f"  Слов (EN): {word_count}")
+        log("WRITER", f"  Blocks:    {len(script)}")
+        log("WRITER", f"  Words:     {word_count}")
 
         for i, block in enumerate(script[:3]):
             tc = block.get("timecode", "??:??")
@@ -545,25 +596,25 @@ def writer_endpoint(req: WriterRequest):
             log("WRITER", f"  [{tc}] {audio}...")
 
         if len(script) > 3:
-            log("WRITER", f"  ... и ещё {len(script) - 3} блоков")
+            log("WRITER", f"  ... and {len(script) - 3} more blocks")
 
-        log("WRITER", f"{C.GREEN}✓ Сценарий сгенерирован!{C.RESET}")
+        log("WRITER", f"{C.GREEN}Script generated!{C.RESET}")
         return script
 
     except Exception as e:
-        log("ERROR", f"Writer провалился: {e}")
+        log("ERROR", f"Writer failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/generate-image")
 def image_endpoint(req: ImageRequest):
-    log("IMAGE", f"Генерация: {req.prompt[:60]}...")
+    log("IMAGE", f"Generating: {req.prompt[:60]}...")
 
     result = call_gemini_image(req.prompt)
     if result:
-        log("IMAGE", f"{C.GREEN}✓ Изображение сгенерировано{C.RESET}")
+        log("IMAGE", f"{C.GREEN}Image generated{C.RESET}")
     else:
-        log("IMAGE", "Изображение не найдено в ответе")
+        log("IMAGE", "No image found in response")
 
     return {"imageUrl": result}
 
@@ -578,7 +629,7 @@ def health():
 
 
 # ═══════════════════════════════════════════════════════════════
-# ЗАПУСК
+# STARTUP
 # ═══════════════════════════════════════════════════════════════
 
 BANNER = f"""
@@ -586,22 +637,22 @@ BANNER = f"""
   ║         SMART.BLOCKBUSTER — Backend Server               ║
   ╚═══════════════════════════════════════════════════════════╝{C.RESET}
 
-  {C.DIM}Синтез методологий Кэллоуэя + Харриса{C.RESET}
+  {C.DIM}Kalloway + Harris Synthesis Methodology{C.RESET}
 
-  {C.GREEN}Сервер:{C.RESET}       http://localhost:{PORT}
+  {C.GREEN}Server:{C.RESET}       http://localhost:{PORT}
   {C.GREEN}API:{C.RESET}          http://localhost:{PORT}/api/*
   {C.GREEN}Health:{C.RESET}       http://localhost:{PORT}/api/health
-  {C.GREEN}Gemini Key:{C.RESET}   {"✓ Установлен" if GEMINI_API_KEY else f"{C.RED}✗ НЕ УСТАНОВЛЕН! Добавьте GEMINI_API_KEY в .env{C.RESET}"}
+  {C.GREEN}Gemini Key:{C.RESET}   {"OK" if GEMINI_API_KEY else f"{C.RED}NOT SET! Add GEMINI_API_KEY to .env{C.RESET}"}
 
-  {C.DIM}Агенты:{C.RESET}
+  {C.DIM}Agents:{C.RESET}
     {C.CYAN}[SCOUT]{C.RESET}     POST /api/scout        {C.DIM}({AGENT_MODELS['SCOUT']}){C.RESET}
     {C.GREEN}[RADAR]{C.RESET}     POST /api/radar        {C.DIM}({AGENT_MODELS['RADAR']}){C.RESET}
     {C.BLUE}[ANALYST]{C.RESET}   POST /api/analyst      {C.DIM}({AGENT_MODELS['ANALYST']}){C.RESET}
     {C.MAGENTA}[ARCHITECT]{C.RESET} POST /api/architect    {C.DIM}({AGENT_MODELS['ARCHITECT']}){C.RESET}
     {C.YELLOW}[WRITER]{C.RESET}    POST /api/writer       {C.DIM}({AGENT_MODELS['WRITER']}){C.RESET}
 
-  {C.DIM}Запустите фронтенд: npm run dev{C.RESET}
-  {C.DIM}Ожидание запросов...{C.RESET}
+  {C.DIM}Start frontend: npm run dev{C.RESET}
+  {C.DIM}Waiting for requests...{C.RESET}
 """
 
 
@@ -609,12 +660,12 @@ if __name__ == "__main__":
     print(BANNER)
 
     if not GEMINI_API_KEY:
-        print(f"\n  {C.RED}{C.BOLD}ОШИБКА: GEMINI_API_KEY не установлен!{C.RESET}")
-        print(f"  Создайте файл .env в корне проекта:")
+        print(f"\n  {C.RED}{C.BOLD}ERROR: GEMINI_API_KEY is not set!{C.RESET}")
+        print(f"  Create a .env file in the project root:")
         print(f"")
-        print(f"    GEMINI_API_KEY=ваш_ключ_от_google_ai_studio")
+        print(f"    GEMINI_API_KEY=your_key_from_google_ai_studio")
         print(f"")
-        print(f"  Получить ключ: https://aistudio.google.com/apikey")
+        print(f"  Get a key: https://aistudio.google.com/apikey")
         sys.exit(1)
 
     uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="warning")

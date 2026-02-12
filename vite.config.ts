@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
           '/api': {
             target: `http://localhost:${env.BACKEND_PORT || '8000'}`,
             changeOrigin: true,
-            timeout: 300000,  // 5 мин — Writer агент может работать долго
+            timeout: 300000,  // 5 min — Writer agent can take a long time
           },
         },
       },
