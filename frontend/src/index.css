@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sb-black: #0a0a0a;
+  --color-sb-dark: #111111;
+  --color-sb-red: #dc2626;
+  --color-sb-amber: #f59e0b;
+  --color-sb-gray: #1f2937;
+  --color-sb-slate: #475569;
+  --color-sb-green: #22c55e;
+  --color-sb-blue: #3b82f6;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-sb-black);
+  color: #e5e7eb;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-sb-black);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-sb-slate);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-sb-amber);
+}
+
+/* Agent chain connector lines */
+.agent-chain-line {
+  width: 2px;
+  height: 20px;
+  margin: 2px auto;
+}
+
+/* Pulse animation for active agent */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px var(--color-sb-amber); }
+  50% { box-shadow: 0 0 16px var(--color-sb-amber); }
+}
+
+.agent-active {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Blinking cursor for log */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.cursor-blink::after {
+  content: "█";
+  animation: blink 1s step-end infinite;
+  color: var(--color-sb-amber);
+}
+
+/* Tab styles */
+.tab-active {
+  border-bottom: 2px solid var(--color-sb-amber);
+  color: var(--color-sb-amber);
+}
+
+.tab-inactive {
+  border-bottom: 2px solid transparent;
+  color: var(--color-sb-slate);
+}
+
+.tab-inactive:hover {
+  color: #e5e7eb;
+}
+
+/* Selection color */
+::selection {
+  background: var(--color-sb-amber);
+  color: var(--color-sb-black);
+}

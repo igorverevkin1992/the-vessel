@@ -83,10 +83,37 @@ Scout → Radar → Analyst → Architect → Writer → [ГОТОВО]
 - 5 этапов: Рисерч → Скелет сюжета → Скриптинг → Съёмка → Пост-продакшн
 - Чек-листы для каждого этапа
 
+## Фронтенд (Web UI)
+
+React-приложение в формате [mediawar.core](https://github.com/igorverevkin1992/mediawar.core-v3.0) — тот же стек и паттерн:
+
+- **React 19** + **TypeScript 5.8** + **Tailwind CSS 4** + **Vite 6**
+- **useReducer** State Machine для управления конвейером
+- **Google Gemini API** (`@google/genai`) для вызова агентов
+- Автоматический и пошаговый режимы с редактированием между агентами
+- Экспорт: Досье `.doc`, Сценарий `.doc`, Монтаж `.csv`
+
+```bash
+cd frontend
+npm install
+echo "VITE_GEMINI_API_KEY=ваш_ключ" > .env
+npm run dev    # http://localhost:3000
+```
+
+### Компоненты
+
+| Компонент | Описание |
+|-----------|----------|
+| `App.tsx` | Главный компонент: state machine, 5 execute-функций, двухколоночный layout |
+| `AgentLog` | Терминальный лог с таймстемпами и цветовой индикацией агентов |
+| `ScriptDisplay` | Таблица A/V сценария + экспорт в 3 формата |
+| `RichTextDisplay` | Рендерер с поддержкой `///` заголовков, `**bold**`, списков |
+| `ErrorBoundary` | Перехват ошибок React с кнопкой перезагрузки |
+
 ## Структура
 
 ```
-smart_blockbuster/
+smart_blockbuster/                 # Python CLI
 ├── __init__.py         # Пакет
 ├── __main__.py         # Точка входа (python -m)
 ├── main.py             # CLI и интерактивное меню
@@ -98,6 +125,23 @@ smart_blockbuster/
 ├── structure.py        # Зубчатая дуга, Петли доказательств, But/Therefore
 ├── analyzer.py         # Анализ текста: Стаккато, коннекторы, ритм, звук
 └── production.py       # Производственный протокол, A/V сценарий, экспорт
+
+frontend/                          # React Web UI
+├── index.html          # HTML-оболочка
+├── package.json        # React 19, Vite 6, Tailwind 4, @google/genai
+├── vite.config.ts      # Конфигурация Vite (порт 3000)
+├── tsconfig.json       # TypeScript конфигурация
+└── src/
+    ├── index.tsx       # Точка входа React
+    ├── index.css       # Tailwind + кастомная тёмная тема (sb-*)
+    ├── App.tsx         # Главный компонент (State Machine + Pipeline)
+    ├── types.ts        # TypeScript типы (зеркало Python моделей)
+    ├── constants.ts    # Промпты агентов, модели, конфигурация
+    └── components/
+        ├── AgentLog.tsx        # Терминальный лог
+        ├── ScriptDisplay.tsx   # Таблица A/V сценария
+        ├── RichTextDisplay.tsx # Рендерер текста
+        └── ErrorBoundary.tsx   # Перехват ошибок
 ```
 
 ## Методология
